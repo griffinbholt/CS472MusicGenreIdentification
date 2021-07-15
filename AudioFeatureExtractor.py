@@ -2,49 +2,54 @@ import librosa
 import numpy as np
 
 class AudioFeatureExtractor():
-    MEAN = '_mean'
-    STD = '_std'
-
+    STATS = ['mean', 'std']
     TEMPO = 'tempo'
-    TIME_DOMAIN = ['amplitude_envelope', 'energy_entropy', 'zero_crossing_rate']
-    FREQ_DOMAIN = ['band_energy_ratio', 'spectral_centroid', 'spectral_bandwidth',
-                   'spectral_rolloff', 'spectral_flatness', 'spectral_contrast',
-                   'spectral_flux']
+    INIT_FEATURE_MATRIX = ['amplitude_envelope', 'root_mean_square_energy', 'energy_entropy', 
+                           'zero_crossing_rate', 'band_energy_ratio', 'spectral_centroid', 
+                           'spectral_bandwidth', 'spectral_rolloff', 'spectral_flatness', 'spectral_contrast']
     MFCC = 'mfcc'
     N_MFCC = 13
     CHROMA = 'chroma'
     N_CHROMA = 12
+    S_FLUX = 'spectral_flux'
     GENRE = 'genre'
 
     def __init__(self, frame_size=1024, hop_length=512):
         self.frame_size=frame_size
         self.hop_length=hop_length
-#         self._generate_input_feature_list()
 
-#     def _generate_input_feature_list(self):
-#         self.input_features = [AudioFeatureExtractor.TEMPO]
-#         for time_feature in AudioFeatureExtractor.TIME_DOMAIN:
-#             self._append_ml_features(time_feature)
-#         for freq_feature in AudioFeatureExtractor.FREQ_DOMAIN:
-#             self._append_ml_features(freq_feature)
-#         self._append_vector_features(AudioFeatureExtractor.N_MFCC, AudioFeatureExtractor.MFCC)
-#         self._append_vector_features(AudioFeatureExtractor.N_CHROMA, AudioFeatureExtractor.CHROMA)
-#         self.input_features.append(AudioFeatureExtractor.GENRE)
+### Generating the feature list 
 
-#     def _append_vector_features(self, n, base_feature):
-#         for i in range(1, n + 1):
-#             audio_feature = base_feature + str(i)
-#             self.input_features.append(audio_feature + AudioFeatureExtractor.MEAN)
+    '''
+    Generate the feature list (73 input features, 1 output feature)
+    Order: 
+        1. tempo
+        2. Means: (ae, rms, ee, zcr, ber, s_centr, sb, s_roll, s_flat, s_contr, mfcc, chroma, s_flux)
+        3. Standard Deviations: "
+        4. genre
+    '''
+    def generate_feature_list(self):
+        feature_list = [AudioFeatureExtractor.TEMPO]
+        audio_features = self._generate_audio_feature_list()
 
-#         for i in range(1, n + 1):
-#             audio_feature = base_feature + str(i)
-#             self.input_features.append(audio_feature + AudioFeatureExtractor.MEAN)
+        for stat in AudioFeatureExtractor.STATS:
+            for feature in audio_features:
+                feature_list.append((feature + '_' + stat))
 
+        feature_list.append(AudioFeatureExtractor.GENRE)
+        return np.array(feature_list)
 
-#     def _append_ml_features(self, audio_feature):
-#         self.input_features.append(audio_feature + AudioFeatureExtractor.MEAN)
-#         self.input_features.append(audio_feature + AudioFeatureExtractor.STD)
+    def _generate_audio_feature_list(self):
+        audio_features = AudioFeatureExtractor.INIT_FEATURE_MATRIX.copy()
 
+        for i in range(1, AudioFeatureExtractor.N_MFCC + 1):
+            audio_features.append((AudioFeatureExtractor.MFCC + str(i)))
+
+        for i in range(1, AudioFeatureExtractor.N_CHROMA + 1):
+            audio_features.append((AudioFeatureExtractor.CHROMA + str(i)))
+
+        audio_features.append(AudioFeatureExtractor.S_FLUX)
+        return audio_features
 
 ### Feature Extraction
 
@@ -104,7 +109,7 @@ class AudioFeatureExtractor():
     def _energy_entropy(self, signal):
         return np.array([self._compute_frame_energy_entropy(signal[i:(i + self.frame_size)]) for i in range(0, len(signal), self.hop_length)])
 
-    def _compute_frame_energy_entropy(self, frame, num_subframes=20):
+    def _compute_frame_energy_entropy(self, frame, num_subframes=10):
         subframe_size = int(np.floor(len(frame) / num_subframes))
         subframes = [frame[i:(i + subframe_size)] for i in range(0, len(frame), subframe_size)]
         
